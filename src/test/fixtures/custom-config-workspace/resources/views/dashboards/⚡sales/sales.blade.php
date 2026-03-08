@@ -1,0 +1,1 @@
+<div>Sales dashboard</div>

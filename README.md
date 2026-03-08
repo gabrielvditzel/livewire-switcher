@@ -1,19 +1,27 @@
-# livewire-switcher README
+# Livewire Switcher
 
-A simple package to switch between the Laravel Livewire class and view files.
+Switch between paired Laravel Livewire files with `CMD + Alt + L` on macOS or `Ctrl + Alt + L` on other platforms.
 
-## Features
+## Credits
 
-Once a Laravel Livewire class or view file is open and active, just run the command `livewire-switcher` to switch between the two files.
+This extension is a fork of the original [Livewire Switcher](https://github.com/bebo925/livewire-switcher) by [bebo925](https://github.com/bebo925).
+This fork adds support for Livewire 4 multi-file components while preserving the legacy switching workflow.
 
-Keyboard shortcut: `CMD + Alt + L`
+## Supported layouts
 
-## Release Notes
+- Livewire 4 multi-file components in `resources/views/components`, `resources/views/livewire`, `resources/views/pages`, and `resources/views/layouts`
+- Custom Livewire 4 component roots declared in `config/livewire.php` through `component_locations` and `component_namespaces`
+- Legacy class-based components in `app/Http/Livewire` or `app/Livewire` paired with Blade views in `resources/views/livewire`
+- Custom legacy roots declared in `config/livewire.php` through `class_path` and `view_path`
 
-### 0.1.0
+## Behavior
 
-Update for Livewire 3
+- Inside a multi-file component, the shortcut toggles between `<name>.php` and `<name>.blade.php`
+- Inside a legacy Livewire component, the shortcut toggles between the class and Blade view
+- Auxiliary multi-file files such as `.js`, `.css`, `.global.css`, and `.test.php` do not switch anywhere
+- Single-file Livewire 4 Blade components do not switch anywhere because they do not have a paired PHP file
 
-### 0.0.1
+## Notes
 
-Initial release
+- The extension keeps the existing command id `livewire-switcher.switch`
+- `config/livewire.php` is parsed statically; dynamic runtime registrations such as `Livewire::addLocation()` are not discovered

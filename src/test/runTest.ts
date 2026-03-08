@@ -1,19 +1,27 @@
+import * as fs from 'fs';
 import * as path from 'path';
 
 import { runTests } from '@vscode/test-electron';
 
 async function main() {
 	try {
-		// The folder containing the Extension Manifest package.json
-		// Passed to `--extensionDevelopmentPath`
 		const extensionDevelopmentPath = path.resolve(__dirname, '../../');
-
-		// The path to test runner
-		// Passed to --extensionTestsPath
 		const extensionTestsPath = path.resolve(__dirname, './suite/index');
+		const fixtureWorkspacePath = path.resolve(__dirname, '../../src/test/fixtures/default-workspace');
+		const preferredExecutablePaths = [
+			process.env.VSCODE_EXEC_PATH,
+			process.platform === 'darwin'
+				? '/Applications/Visual Studio Code.app/Contents/MacOS/Electron'
+				: undefined,
+		].filter((value): value is string => Boolean(value));
+		const vscodeExecutablePath = preferredExecutablePaths.find((candidatePath) => fs.existsSync(candidatePath));
 
-		// Download VS Code, unzip it and run the integration test
-		await runTests({ extensionDevelopmentPath, extensionTestsPath });
+		await runTests({
+			extensionDevelopmentPath,
+			extensionTestsPath,
+			launchArgs: [fixtureWorkspacePath, '--disable-extensions'],
+			...(vscodeExecutablePath ? { vscodeExecutablePath } : {}),
+		});
 	} catch (err) {
 		console.error('Failed to run tests');
 		process.exit(1);

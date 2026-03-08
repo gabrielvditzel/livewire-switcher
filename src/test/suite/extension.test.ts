@@ -1,15 +1,35 @@
 import * as assert from 'assert';
-
-// You can import and use all API from the 'vscode' module
-// as well as import your extension to test it
+import * as path from 'path';
 import * as vscode from 'vscode';
-// import * as myExtension from '../../extension';
 
-suite('Extension Test Suite', () => {
-	vscode.window.showInformationMessage('Start all tests.');
+suite('Extension command smoke tests', () => {
+	test('switch command opens the paired multi-file Blade view', async () => {
+		const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+		assert.ok(workspaceFolder, 'Expected the fixture workspace to be open.');
 
-	test('Sample test', () => {
-		assert.strictEqual(-1, [1, 2, 3].indexOf(5));
-		assert.strictEqual(-1, [1, 2, 3].indexOf(0));
+		const phpFilePath = path.join(
+			workspaceFolder.uri.fsPath,
+			'resources',
+			'views',
+			'components',
+			'admin',
+			'⚡user-table',
+			'user-table.php'
+		);
+		const expectedBladePath = path.join(
+			workspaceFolder.uri.fsPath,
+			'resources',
+			'views',
+			'components',
+			'admin',
+			'⚡user-table',
+			'user-table.blade.php'
+		);
+
+		const document = await vscode.workspace.openTextDocument(vscode.Uri.file(phpFilePath));
+		await vscode.window.showTextDocument(document);
+		await vscode.commands.executeCommand('livewire-switcher.switch');
+
+		assert.strictEqual(vscode.window.activeTextEditor?.document.uri.fsPath, expectedBladePath);
 	});
 });
