@@ -3,9 +3,10 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 
 suite('Extension command smoke tests', () => {
-	test('switch command cycles through multi-file component files', async () => {
+	test('switch command respects workspace extra target settings', async () => {
 		const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
 		assert.ok(workspaceFolder, 'Expected the fixture workspace to be open.');
+		const configuration = vscode.workspace.getConfiguration('livewireSwitcher', workspaceFolder.uri);
 
 		const phpFilePath = path.join(
 			workspaceFolder.uri.fsPath,
@@ -35,14 +36,24 @@ suite('Extension command smoke tests', () => {
 			'orders.js'
 		);
 
-		const document = await vscode.workspace.openTextDocument(vscode.Uri.file(phpFilePath));
-		await vscode.window.showTextDocument(document);
-		await vscode.commands.executeCommand('livewire-switcher.switch');
+		await configuration.update('multiFile.extraTargets', ['js'], vscode.ConfigurationTarget.Workspace);
 
-		assert.strictEqual(vscode.window.activeTextEditor?.document.uri.fsPath, expectedBladePath);
+		try {
+			const document = await vscode.workspace.openTextDocument(vscode.Uri.file(phpFilePath));
+			await vscode.window.showTextDocument(document);
+			await vscode.commands.executeCommand('livewire-switcher.switch');
 
-		await vscode.commands.executeCommand('livewire-switcher.switch');
+			assert.strictEqual(vscode.window.activeTextEditor?.document.uri.fsPath, expectedBladePath);
 
-		assert.strictEqual(vscode.window.activeTextEditor?.document.uri.fsPath, expectedJsPath);
+			await vscode.commands.executeCommand('livewire-switcher.switch');
+
+			assert.strictEqual(vscode.window.activeTextEditor?.document.uri.fsPath, expectedJsPath);
+
+			await vscode.commands.executeCommand('livewire-switcher.switch');
+
+			assert.strictEqual(vscode.window.activeTextEditor?.document.uri.fsPath, phpFilePath);
+		} finally {
+			await configuration.update('multiFile.extraTargets', undefined, vscode.ConfigurationTarget.Workspace);
+		}
 	});
 });

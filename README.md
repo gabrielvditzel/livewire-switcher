@@ -22,6 +22,14 @@ This fork adds support for Livewire 4 multi-file components while preserving the
 - Auxiliary multi-file files such as `.css` and `.global.css` do not switch anywhere
 - Single-file Livewire 4 Blade components do not switch anywhere because they do not have a paired PHP file
 
+## Settings
+
+- `livewireSwitcher.multiFile.extraTargets`: controls which extra multi-file targets participate in the cycle
+- Accepted values: `js`, `test`
+- Default: `["js", "test"]`
+- Example: setting `["js"]` changes the cycle to `PHP -> Blade -> JS -> PHP`
+- Example: setting `[]` limits the cycle to `PHP -> Blade -> PHP`
+
 ## Notes
 
 - The extension keeps the existing command id `livewire-switcher.switch`

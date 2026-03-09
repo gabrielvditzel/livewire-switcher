@@ -10,6 +10,7 @@ const DEFAULT_COMPONENT_NAMESPACES: Record<string, string> = {
 };
 
 export type NoopReason = 'unsupported' | 'single-file' | 'auxiliary' | 'missing-counterpart';
+export type MultiFileExtraTarget = 'js' | 'test';
 
 export interface ResolvedLivewireConfig {
 	legacyViewPath: string;
@@ -31,10 +32,17 @@ export type SwitchResolution =
 		searchedPaths?: string[];
 	};
 
+export interface MultiFileSwitchOptions {
+	enabledExtraTargets?: MultiFileExtraTarget[];
+}
+
 type SwitchableFileKind = 'blade' | 'php' | 'js' | 'test';
 type FileKind = SwitchableFileKind | 'auxiliary' | 'unsupported';
 
-const MULTI_FILE_CYCLE: SwitchableFileKind[] = ['php', 'blade', 'js', 'test'];
+const DEFAULT_MULTI_FILE_EXTRA_TARGETS: MultiFileExtraTarget[] = ['js', 'test'];
+const FIXED_MULTI_FILE_CYCLE: Array<'php' | 'blade'> = ['php', 'blade'];
+const MULTI_FILE_EXTRA_TARGET_ORDER: MultiFileExtraTarget[] = ['js', 'test'];
+const MULTI_FILE_EXTRA_TARGET_SETTING = 'livewireSwitcher.multiFile.extraTargets';
 
 interface FileDescriptor {
 	kind: FileKind;
@@ -91,13 +99,14 @@ export async function loadLivewireConfig(workspaceRoot: string): Promise<Resolve
 
 export async function resolveSwitchTarget(
 	workspaceRoot: string,
-	activeFilePath: string
+	activeFilePath: string,
+	options: MultiFileSwitchOptions = {}
 ): Promise<SwitchResolution> {
 	const normalizedRoot = path.resolve(workspaceRoot);
 	const normalizedFilePath = path.resolve(activeFilePath);
 	const config = await loadLivewireConfig(normalizedRoot);
 
-	const multiFileResolution = await resolveMultiFileSwitch(config, normalizedFilePath);
+	const multiFileResolution = await resolveMultiFileSwitch(config, normalizedFilePath, options);
 	if (multiFileResolution) {
 		return multiFileResolution;
 	}
@@ -148,7 +157,8 @@ async function readLivewireConfigOverrides(workspaceRoot: string): Promise<Parse
 
 async function resolveMultiFileSwitch(
 	config: ResolvedLivewireConfig,
-	activeFilePath: string
+	activeFilePath: string,
+	options: MultiFileSwitchOptions
 ): Promise<SwitchResolution | undefined> {
 	const componentRoot = findContainingRoot(activeFilePath, config.componentRoots);
 	if (!componentRoot) {
@@ -180,10 +190,16 @@ async function resolveMultiFileSwitch(
 		return undefined;
 	}
 
+	const cycle = buildMultiFileCycle(options.enabledExtraTargets);
+	if (isDisabledExtraTarget(fileDescriptor.kind, cycle)) {
+		return buildNoop('unsupported', buildDisabledTargetMessage(fileDescriptor.kind));
+	}
+
 	const candidatePaths = getOrderedMultiFileCandidatePaths(
 		path.dirname(activeFilePath),
 		normalizedComponentName,
-		fileDescriptor.kind
+		fileDescriptor.kind,
+		cycle
 	);
 
 	for (const candidatePath of candidatePaths) {
@@ -285,22 +301,54 @@ function resolveViewBasedNoop(
 function getOrderedMultiFileCandidatePaths(
 	componentDirectory: string,
 	baseName: string,
-	currentKind: SwitchableFileKind
+	currentKind: SwitchableFileKind,
+	cycle: SwitchableFileKind[]
 ): string[] {
-	return getOrderedAlternativeKinds(currentKind).map((kind) =>
+	return getOrderedAlternativeKinds(currentKind, cycle).map((kind) =>
 		path.join(componentDirectory, buildMultiFileFileName(baseName, kind))
 	);
 }
 
-function getOrderedAlternativeKinds(currentKind: SwitchableFileKind): SwitchableFileKind[] {
-	const currentIndex = MULTI_FILE_CYCLE.indexOf(currentKind);
+function buildMultiFileCycle(enabledExtraTargets: MultiFileExtraTarget[] | undefined): SwitchableFileKind[] {
+	const normalizedExtraTargets = normalizeEnabledExtraTargets(enabledExtraTargets);
+
+	return [
+		...FIXED_MULTI_FILE_CYCLE,
+		...MULTI_FILE_EXTRA_TARGET_ORDER.filter((kind) => normalizedExtraTargets.includes(kind)),
+	];
+}
+
+function normalizeEnabledExtraTargets(
+	enabledExtraTargets: MultiFileExtraTarget[] | undefined
+): MultiFileExtraTarget[] {
+	if (!enabledExtraTargets) {
+		return DEFAULT_MULTI_FILE_EXTRA_TARGETS;
+	}
+
+	return MULTI_FILE_EXTRA_TARGET_ORDER.filter((kind) => enabledExtraTargets.includes(kind));
+}
+
+function isDisabledExtraTarget(
+	kind: SwitchableFileKind,
+	cycle: SwitchableFileKind[]
+): kind is MultiFileExtraTarget {
+	return (kind === 'js' || kind === 'test') && !cycle.includes(kind);
+}
+
+function buildDisabledTargetMessage(kind: MultiFileExtraTarget): string {
+	const label = kind === 'js' ? 'JavaScript files' : 'Test files';
+	return `${label} are disabled in \`${MULTI_FILE_EXTRA_TARGET_SETTING}\`.`;
+}
+
+function getOrderedAlternativeKinds(currentKind: SwitchableFileKind, cycle: SwitchableFileKind[]): SwitchableFileKind[] {
+	const currentIndex = cycle.indexOf(currentKind);
 	if (currentIndex === -1) {
 		return [];
 	}
 
 	const alternatives: SwitchableFileKind[] = [];
-	for (let offset = 1; offset < MULTI_FILE_CYCLE.length; offset += 1) {
-		alternatives.push(MULTI_FILE_CYCLE[(currentIndex + offset) % MULTI_FILE_CYCLE.length]);
+	for (let offset = 1; offset < cycle.length; offset += 1) {
+		alternatives.push(cycle[(currentIndex + offset) % cycle.length]);
 	}
 
 	return alternatives;

@@ -2,7 +2,7 @@
   "name": "livewire-v4-mfc-switcher",
   "displayName": "Livewire v4 MFC Switcher",
   "description": "Switch between component class and view files for Laravel Livewire",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "gabrielvditzel",
   "icon": "logo.png",
   "repository": {
@@ -33,7 +33,27 @@
         "key": "alt+ctrl+l",
         "mac": "cmd+alt+l"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Livewire Switcher",
+      "properties": {
+        "livewireSwitcher.multiFile.extraTargets": {
+          "type": "array",
+          "default": [
+            "js",
+            "test"
+          ],
+          "items": {
+            "type": "string",
+            "enum": [
+              "js",
+              "test"
+            ]
+          },
+          "description": "Controls which extra multi-file Livewire targets are included in the switch cycle. PHP and Blade are always enabled."
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

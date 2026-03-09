@@ -152,6 +152,62 @@ suite('Livewire resolver', () => {
 		);
 	});
 
+	test('removes test files from the cycle when only js is enabled', async () => {
+		const resolution = await resolveSwitchTarget(
+			defaultWorkspaceRoot,
+			path.join(defaultWorkspaceRoot, 'resources', 'views', 'livewire', 'dashboard', '⚡orders', 'orders.js'),
+			{ enabledExtraTargets: ['js'] }
+		);
+
+		assertTarget(
+			resolution,
+			path.join(defaultWorkspaceRoot, 'resources', 'views', 'livewire', 'dashboard', '⚡orders', 'orders.php')
+		);
+	});
+
+	test('reduces the cycle to php and blade when extras are disabled', async () => {
+		const resolution = await resolveSwitchTarget(
+			defaultWorkspaceRoot,
+			path.join(defaultWorkspaceRoot, 'resources', 'views', 'livewire', 'dashboard', '⚡orders', 'orders.blade.php'),
+			{ enabledExtraTargets: [] }
+		);
+
+		assertTarget(
+			resolution,
+			path.join(defaultWorkspaceRoot, 'resources', 'views', 'livewire', 'dashboard', '⚡orders', 'orders.php')
+		);
+	});
+
+	test('returns an informative noop when JavaScript files are disabled', async () => {
+		const resolution = await resolveSwitchTarget(
+			defaultWorkspaceRoot,
+			path.join(defaultWorkspaceRoot, 'resources', 'views', 'livewire', 'dashboard', '⚡orders', 'orders.js'),
+			{ enabledExtraTargets: [] }
+		);
+
+		assertNoop(
+			resolution,
+			'unsupported',
+			undefined,
+			'JavaScript files are disabled in `livewireSwitcher.multiFile.extraTargets`.'
+		);
+	});
+
+	test('returns an informative noop when test files are disabled', async () => {
+		const resolution = await resolveSwitchTarget(
+			defaultWorkspaceRoot,
+			path.join(defaultWorkspaceRoot, 'resources', 'views', 'livewire', 'dashboard', '⚡orders', 'orders.test.php'),
+			{ enabledExtraTargets: ['js'] }
+		);
+
+		assertNoop(
+			resolution,
+			'unsupported',
+			undefined,
+			'Test files are disabled in `livewireSwitcher.multiFile.extraTargets`.'
+		);
+	});
+
 	test('cycles multi-file components from test back to PHP', async () => {
 		const resolution = await resolveSwitchTarget(
 			defaultWorkspaceRoot,
@@ -239,6 +295,27 @@ suite('Livewire resolver', () => {
 		);
 	});
 
+	test('omits disabled extras from missing counterpart messages', async () => {
+		const resolution = await resolveSwitchTarget(
+			defaultWorkspaceRoot,
+			path.join(defaultWorkspaceRoot, 'resources', 'views', 'components', 'broken', '⚡missing', 'missing.php'),
+			{ enabledExtraTargets: ['js'] }
+		);
+
+		assertNoop(
+			resolution,
+			'missing-counterpart',
+			[
+				path.join(defaultWorkspaceRoot, 'resources', 'views', 'components', 'broken', '⚡missing', 'missing.blade.php'),
+				path.join(defaultWorkspaceRoot, 'resources', 'views', 'components', 'broken', '⚡missing', 'missing.js'),
+			]
+		);
+		assertExcludesSearchedPath(
+			resolution,
+			path.join(defaultWorkspaceRoot, 'resources', 'views', 'components', 'broken', '⚡missing', 'missing.test.php')
+		);
+	});
+
 	test('reports missing counterparts for legacy classes with no Blade view', async () => {
 		const resolution = await resolveSwitchTarget(
 			defaultWorkspaceRoot,
@@ -313,10 +390,19 @@ function assertTarget(resolution: SwitchResolution, expectedPath: string): void 
 	}
 }
 
+function assertExcludesSearchedPath(resolution: SwitchResolution, excludedPath: string): void {
+	assert.strictEqual(resolution.kind, 'noop');
+	if (resolution.kind === 'noop') {
+		assert.ok(!resolution.searchedPaths?.includes(excludedPath));
+		assert.ok(!resolution.message.includes(excludedPath));
+	}
+}
+
 function assertNoop(
 	resolution: SwitchResolution,
 	expectedReason: NoopReason,
-	expectedPaths?: string | string[]
+	expectedPaths?: string | string[],
+	expectedMessage?: string
 ): void {
 	assert.strictEqual(resolution.kind, 'noop');
 	if (resolution.kind === 'noop') {
@@ -324,6 +410,9 @@ function assertNoop(
 		for (const expectedPath of normalizeExpectedPaths(expectedPaths)) {
 			assert.ok(resolution.searchedPaths?.includes(expectedPath));
 			assert.ok(resolution.message.includes(expectedPath));
+		}
+		if (expectedMessage) {
+			assert.strictEqual(resolution.message, expectedMessage);
 		}
 	}
 }

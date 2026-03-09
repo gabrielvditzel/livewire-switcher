@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
-import { resolveSwitchTarget } from './livewire';
+import { MultiFileExtraTarget, resolveSwitchTarget } from './livewire';
+
+const VALID_MULTI_FILE_EXTRA_TARGETS: MultiFileExtraTarget[] = ['js', 'test'];
 
 export function activate(context: vscode.ExtensionContext) {
 	const disposable = vscode.commands.registerCommand('livewire-switcher.switch', async () => {
@@ -15,9 +17,15 @@ export function activate(context: vscode.ExtensionContext) {
 			return;
 		}
 
+		const configuration = vscode.workspace.getConfiguration('livewireSwitcher', activeEditor.document.uri);
+		const enabledExtraTargets = normalizeEnabledExtraTargets(
+			configuration.get<unknown>('multiFile.extraTargets')
+		);
+
 		const resolution = await resolveSwitchTarget(
 			workspaceFolder.uri.fsPath,
-			activeEditor.document.uri.fsPath
+			activeEditor.document.uri.fsPath,
+			{ enabledExtraTargets }
 		);
 
 		if (resolution.kind === 'noop') {
@@ -38,3 +46,11 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {}
+
+function normalizeEnabledExtraTargets(value: unknown): MultiFileExtraTarget[] {
+	if (!Array.isArray(value)) {
+		return [...VALID_MULTI_FILE_EXTRA_TARGETS];
+	}
+
+	return VALID_MULTI_FILE_EXTRA_TARGETS.filter((target) => value.includes(target));
+}
