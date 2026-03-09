@@ -31,7 +31,10 @@ export type SwitchResolution =
 		searchedPaths?: string[];
 	};
 
-type FileKind = 'blade' | 'php' | 'auxiliary' | 'unsupported';
+type SwitchableFileKind = 'blade' | 'php' | 'js' | 'test';
+type FileKind = SwitchableFileKind | 'auxiliary' | 'unsupported';
+
+const MULTI_FILE_CYCLE: SwitchableFileKind[] = ['php', 'blade', 'js', 'test'];
 
 interface FileDescriptor {
 	kind: FileKind;
@@ -177,21 +180,24 @@ async function resolveMultiFileSwitch(
 		return undefined;
 	}
 
-	const targetFileName = fileDescriptor.kind === 'blade'
-		? `${normalizedComponentName}.php`
-		: `${normalizedComponentName}.blade.php`;
-	const targetPath = path.join(path.dirname(activeFilePath), targetFileName);
+	const candidatePaths = getOrderedMultiFileCandidatePaths(
+		path.dirname(activeFilePath),
+		normalizedComponentName,
+		fileDescriptor.kind
+	);
 
-	if (await pathExists(targetPath)) {
-		return {
-			kind: 'target',
-			targetPath,
-		};
+	for (const candidatePath of candidatePaths) {
+		if (await pathExists(candidatePath)) {
+			return {
+				kind: 'target',
+				targetPath: candidatePath,
+			};
+		}
 	}
 
 	return buildMissingCounterpart(
-		`No matching Livewire multi-file component file was found. Looked for: ${targetPath}`,
-		[targetPath]
+		`No other switchable Livewire multi-file component files were found. Looked for: ${candidatePaths.join(', ')}`,
+		candidatePaths
 	);
 }
 
@@ -276,6 +282,45 @@ function resolveViewBasedNoop(
 	return buildNoop('unsupported', 'This file is not a switchable Livewire component file.');
 }
 
+function getOrderedMultiFileCandidatePaths(
+	componentDirectory: string,
+	baseName: string,
+	currentKind: SwitchableFileKind
+): string[] {
+	return getOrderedAlternativeKinds(currentKind).map((kind) =>
+		path.join(componentDirectory, buildMultiFileFileName(baseName, kind))
+	);
+}
+
+function getOrderedAlternativeKinds(currentKind: SwitchableFileKind): SwitchableFileKind[] {
+	const currentIndex = MULTI_FILE_CYCLE.indexOf(currentKind);
+	if (currentIndex === -1) {
+		return [];
+	}
+
+	const alternatives: SwitchableFileKind[] = [];
+	for (let offset = 1; offset < MULTI_FILE_CYCLE.length; offset += 1) {
+		alternatives.push(MULTI_FILE_CYCLE[(currentIndex + offset) % MULTI_FILE_CYCLE.length]);
+	}
+
+	return alternatives;
+}
+
+function buildMultiFileFileName(baseName: string, kind: SwitchableFileKind): string {
+	switch (kind) {
+		case 'blade':
+			return `${baseName}.blade.php`;
+		case 'js':
+			return `${baseName}.js`;
+		case 'test':
+			return `${baseName}.test.php`;
+		case 'php':
+			return `${baseName}.php`;
+	}
+
+	return `${baseName}.php`;
+}
+
 function describeFile(fileName: string): FileDescriptor {
 	if (fileName.endsWith('.blade.php')) {
 		return {
@@ -293,14 +338,14 @@ function describeFile(fileName: string): FileDescriptor {
 
 	if (fileName.endsWith('.test.php')) {
 		return {
-			kind: 'auxiliary',
+			kind: 'test',
 			baseName: fileName.slice(0, -'.test.php'.length),
 		};
 	}
 
 	if (fileName.endsWith('.js')) {
 		return {
-			kind: 'auxiliary',
+			kind: 'js',
 			baseName: fileName.slice(0, -'.js'.length),
 		};
 	}

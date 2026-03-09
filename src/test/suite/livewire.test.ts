@@ -119,7 +119,43 @@ suite('Livewire resolver', () => {
 	test('switches nested multi-file components in resources/views/livewire before considering legacy mapping', async () => {
 		const resolution = await resolveSwitchTarget(
 			defaultWorkspaceRoot,
+			path.join(defaultWorkspaceRoot, 'resources', 'views', 'livewire', 'dashboard', '⚡orders', 'orders.php')
+		);
+
+		assertTarget(
+			resolution,
 			path.join(defaultWorkspaceRoot, 'resources', 'views', 'livewire', 'dashboard', '⚡orders', 'orders.blade.php')
+		);
+	});
+
+	test('cycles multi-file components from Blade to JavaScript', async () => {
+		const resolution = await resolveSwitchTarget(
+			defaultWorkspaceRoot,
+			path.join(defaultWorkspaceRoot, 'resources', 'views', 'livewire', 'dashboard', '⚡orders', 'orders.blade.php')
+		);
+
+		assertTarget(
+			resolution,
+			path.join(defaultWorkspaceRoot, 'resources', 'views', 'livewire', 'dashboard', '⚡orders', 'orders.js')
+		);
+	});
+
+	test('cycles multi-file components from JavaScript to test', async () => {
+		const resolution = await resolveSwitchTarget(
+			defaultWorkspaceRoot,
+			path.join(defaultWorkspaceRoot, 'resources', 'views', 'livewire', 'dashboard', '⚡orders', 'orders.js')
+		);
+
+		assertTarget(
+			resolution,
+			path.join(defaultWorkspaceRoot, 'resources', 'views', 'livewire', 'dashboard', '⚡orders', 'orders.test.php')
+		);
+	});
+
+	test('cycles multi-file components from test back to PHP', async () => {
+		const resolution = await resolveSwitchTarget(
+			defaultWorkspaceRoot,
+			path.join(defaultWorkspaceRoot, 'resources', 'views', 'livewire', 'dashboard', '⚡orders', 'orders.test.php')
 		);
 
 		assertTarget(
@@ -128,13 +164,38 @@ suite('Livewire resolver', () => {
 		);
 	});
 
-	test('does not switch auxiliary multi-file assets', async () => {
-		const resolution = await resolveSwitchTarget(
+	test('skips missing files when cycling multi-file components', async () => {
+		const phpResolution = await resolveSwitchTarget(
 			defaultWorkspaceRoot,
-			path.join(defaultWorkspaceRoot, 'resources', 'views', 'livewire', 'dashboard', '⚡orders', 'orders.js')
+			path.join(defaultWorkspaceRoot, 'resources', 'views', 'components', 'broken', '⚡php-js', 'php-js.php')
+		);
+		const jsResolution = await resolveSwitchTarget(
+			defaultWorkspaceRoot,
+			path.join(defaultWorkspaceRoot, 'resources', 'views', 'components', 'broken', '⚡php-js', 'php-js.js')
 		);
 
-		assertNoop(resolution, 'auxiliary');
+		assertTarget(
+			phpResolution,
+			path.join(defaultWorkspaceRoot, 'resources', 'views', 'components', 'broken', '⚡php-js', 'php-js.js')
+		);
+		assertTarget(
+			jsResolution,
+			path.join(defaultWorkspaceRoot, 'resources', 'views', 'components', 'broken', '⚡php-js', 'php-js.php')
+		);
+	});
+
+	test('keeps CSS multi-file assets as auxiliary files', async () => {
+		const cssResolution = await resolveSwitchTarget(
+			defaultWorkspaceRoot,
+			path.join(defaultWorkspaceRoot, 'resources', 'views', 'livewire', 'dashboard', '⚡orders', 'orders.css')
+		);
+		const globalCssResolution = await resolveSwitchTarget(
+			defaultWorkspaceRoot,
+			path.join(defaultWorkspaceRoot, 'resources', 'views', 'livewire', 'dashboard', '⚡orders', 'orders.global.css')
+		);
+
+		assertNoop(cssResolution, 'auxiliary');
+		assertNoop(globalCssResolution, 'auxiliary');
 	});
 
 	test('treats standalone Blade files in view-based roots as single-file components', async () => {
@@ -170,7 +231,11 @@ suite('Livewire resolver', () => {
 		assertNoop(
 			resolution,
 			'missing-counterpart',
-			path.join(defaultWorkspaceRoot, 'resources', 'views', 'components', 'broken', '⚡missing', 'missing.blade.php')
+			[
+				path.join(defaultWorkspaceRoot, 'resources', 'views', 'components', 'broken', '⚡missing', 'missing.blade.php'),
+				path.join(defaultWorkspaceRoot, 'resources', 'views', 'components', 'broken', '⚡missing', 'missing.js'),
+				path.join(defaultWorkspaceRoot, 'resources', 'views', 'components', 'broken', '⚡missing', 'missing.test.php'),
+			]
 		);
 	});
 
@@ -251,14 +316,22 @@ function assertTarget(resolution: SwitchResolution, expectedPath: string): void 
 function assertNoop(
 	resolution: SwitchResolution,
 	expectedReason: NoopReason,
-	expectedPath?: string
+	expectedPaths?: string | string[]
 ): void {
 	assert.strictEqual(resolution.kind, 'noop');
 	if (resolution.kind === 'noop') {
 		assert.strictEqual(resolution.reason, expectedReason);
-		if (expectedPath) {
+		for (const expectedPath of normalizeExpectedPaths(expectedPaths)) {
 			assert.ok(resolution.searchedPaths?.includes(expectedPath));
 			assert.ok(resolution.message.includes(expectedPath));
 		}
 	}
+}
+
+function normalizeExpectedPaths(expectedPaths?: string | string[]): string[] {
+	if (!expectedPaths) {
+		return [];
+	}
+
+	return Array.isArray(expectedPaths) ? expectedPaths : [expectedPaths];
 }

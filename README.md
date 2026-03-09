@@ -16,9 +16,10 @@ This fork adds support for Livewire 4 multi-file components while preserving the
 
 ## Behavior
 
-- Inside a multi-file component, the shortcut toggles between `<name>.php` and `<name>.blade.php`
+- Inside a multi-file component, the shortcut cycles through `<name>.php`, `<name>.blade.php`, `<name>.js`, and `<name>.test.php` when those files exist
 - Inside a legacy Livewire component, the shortcut toggles between the class and Blade view
-- Auxiliary multi-file files such as `.js`, `.css`, `.global.css`, and `.test.php` do not switch anywhere
+- Multi-file cycle order is `PHP -> Blade -> JS -> Test -> PHP`, skipping missing files
+- Auxiliary multi-file files such as `.css` and `.global.css` do not switch anywhere
 - Single-file Livewire 4 Blade components do not switch anywhere because they do not have a paired PHP file
 
 ## Notes

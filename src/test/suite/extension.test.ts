@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 
 suite('Extension command smoke tests', () => {
-	test('switch command opens the paired multi-file Blade view', async () => {
+	test('switch command cycles through multi-file component files', async () => {
 		const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
 		assert.ok(workspaceFolder, 'Expected the fixture workspace to be open.');
 
@@ -11,19 +11,28 @@ suite('Extension command smoke tests', () => {
 			workspaceFolder.uri.fsPath,
 			'resources',
 			'views',
-			'components',
-			'admin',
-			'⚡user-table',
-			'user-table.php'
+			'livewire',
+			'dashboard',
+			'⚡orders',
+			'orders.php'
 		);
 		const expectedBladePath = path.join(
 			workspaceFolder.uri.fsPath,
 			'resources',
 			'views',
-			'components',
-			'admin',
-			'⚡user-table',
-			'user-table.blade.php'
+			'livewire',
+			'dashboard',
+			'⚡orders',
+			'orders.blade.php'
+		);
+		const expectedJsPath = path.join(
+			workspaceFolder.uri.fsPath,
+			'resources',
+			'views',
+			'livewire',
+			'dashboard',
+			'⚡orders',
+			'orders.js'
 		);
 
 		const document = await vscode.workspace.openTextDocument(vscode.Uri.file(phpFilePath));
@@ -31,5 +40,9 @@ suite('Extension command smoke tests', () => {
 		await vscode.commands.executeCommand('livewire-switcher.switch');
 
 		assert.strictEqual(vscode.window.activeTextEditor?.document.uri.fsPath, expectedBladePath);
+
+		await vscode.commands.executeCommand('livewire-switcher.switch');
+
+		assert.strictEqual(vscode.window.activeTextEditor?.document.uri.fsPath, expectedJsPath);
 	});
 });
